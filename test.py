@@ -7,6 +7,7 @@ from urllib import request
 from urllib import parse
 from collections import deque
 from bs4 import BeautifulSoup
+import re
 
 #request任务队列
 request_tasks=deque([])
@@ -63,7 +64,7 @@ def getpage():  #根据url获取下载网页
             parse_tasks.append(filename)
             print(parse_tasks)
             print('网页'+str(tempid)+'下载完成！')
-            parseHtml('data'+str(tempid)+'.html')
+            parseHtml('data'+str(tempid)+'.html') #解析html并写入文件
             tempid+=1
             time.sleep(round(random.random(),2))
         else:            
@@ -73,10 +74,33 @@ def getpage():  #根据url获取下载网页
     print(parse_tasks)
     f_result.close()
 
-    
+def getpageNum(url):
+    #下载链接
+    user_agent='Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36'
+    headers={'User-Agent':user_agent}
+    req=request.Request(url,headers=headers)
+    res=urllib.request.urlopen(req)
+    #解析页码
+    flag=False
+    numsoup=BeautifulSoup(res,'lxml')
+    if numsoup.find('div',id='page'):
+        for child in numsoup.find_all('span'):
+            if re.match(r'共(.*)页',child.get_text()):
+                flag=True
+                matchgroup = re.match(r'共(.*)页',child.get_text())
+                num=matchgroup.group(1)
+                return int(num)
+        if flag==False:
+            return 1
+    else:
+        return 1
+        
 
 
 area=urllib.parse.quote_plus(input("请输入您要查询的区域：\n"))
+#获取查询的地址页面数量
+urlp='http://www.ziroom.com/z/nl/z2.html?qwd='+area
+pageNum=getpageNum(urlp)
 queueLock = threading.Lock()
 
 #开启网页下载解析线程
@@ -89,7 +113,7 @@ except:
 f_result=open('result.csv','a+')
 
 #构造urls，测试用13个网页，搜索城市：北京
-for i in range(1,14):
+for i in range(1,pageNum+1):
     url='http://www.ziroom.com/z/nl/z2.html?qwd='+area+'&p='+str(i)
     queueLock.acquire()
     request_tasks.append(url)
